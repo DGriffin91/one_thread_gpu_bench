@@ -104,7 +104,8 @@ pub struct Options {
 }
 
 pub fn main() {
-    let options: Options = Options::from_args();
+    std::env::set_var("WGPU_POWER_PREF", "high");
 
+    let options: Options = Options::from_args();
     return compute::start(&options);
 }

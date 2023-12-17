@@ -12,7 +12,15 @@ use wgpu::{
 pub fn start(options: &Options) {
     let compiled_shader_modules = maybe_watch(options, None);
 
-    let gpu_result = futures::executor::block_on(start_internal(options, compiled_shader_modules));
+    //let compiled_shader_modules = CompiledShaderModules {
+    //    named_spv_modules: vec![(None, include_spirv_raw!("compute_shader.spv"))],
+    //};
+
+    let mut gpu_result = f32::MAX;
+    gpu_result = gpu_result.min(futures::executor::block_on(start_internal(
+        options,
+        &compiled_shader_modules,
+    )));
 
     let start = Instant::now();
     let cpu_result = compute_shader::compute(options.size);
@@ -21,7 +29,7 @@ pub fn start(options: &Options) {
     assert_eq!(gpu_result, cpu_result);
 }
 
-async fn start_internal(options: &Options, compiled_shader_modules: CompiledShaderModules) -> f32 {
+async fn start_internal(options: &Options, compiled_shader_modules: &CompiledShaderModules) -> f32 {
     let backends = backend_bits_from_env().unwrap_or(Backends::PRIMARY);
     let instance = Instance::new(InstanceDescriptor {
         backends,
@@ -148,6 +156,12 @@ async fn start_internal(options: &Options, compiled_shader_modules: CompiledShad
         let mut cpass = encoder.begin_compute_pass(&ComputePassDescriptor { label: None });
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.set_pipeline(&compute_pipeline);
+        // Warm up
+        cpass.dispatch_workgroups(1, 1, 1);
+        cpass.dispatch_workgroups(1, 1, 1);
+        cpass.dispatch_workgroups(1, 1, 1);
+        cpass.dispatch_workgroups(1, 1, 1);
+        // Start bench
         timestamp.start(&mut cpass);
         cpass.dispatch_workgroups(1, 1, 1);
         timestamp.end(&mut cpass);
