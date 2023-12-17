@@ -1,0 +1,21 @@
+[package]
+name = "one_thread_gpu_bench"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+# Only here to show bench CPU/GPU time comparison all at the same time
+compute_shader = { path = "./shaders/compute_shader" }
+
+futures = { version = "0.3", default-features = false, features = [
+    "std",
+    "executor",
+] }
+# Vulkan SDK or MoltenVK needs to be installed for `vulkan-portability` to work on macOS
+wgpu = { version = "0.16.0", features = ["spirv", "vulkan-portability"] }
+structopt = "0.3"
+bytemuck = "1.6.3"
+
+spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "83f8c72f04a6af673b0533a0f03527b7756f883e", features = [
+    "watch",
+] }
