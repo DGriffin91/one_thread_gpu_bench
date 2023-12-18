@@ -1,6 +1,12 @@
-use crate::{maybe_watch, timestamp::Timestamp, CompiledShaderModules, Options};
+use crate::{maybe_watch, timestamp::Timestamp, Options};
 
-use std::{convert::TryInto, time::Instant};
+use std::{
+    convert::TryInto,
+    io::Read,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{Duration, Instant},
+};
 use wgpu::{
     util::{
         backend_bits_from_env, dx12_shader_compiler_from_env,
@@ -9,27 +15,93 @@ use wgpu::{
     *,
 };
 
+fn load_shader_module(path: &Path) -> Vec<u8> {
+    let mut f = std::fs::File::open(&path).expect("no file found");
+    let metadata = std::fs::metadata(&path).expect("unable to read metadata");
+    let mut buffer = vec![0; metadata.len() as usize];
+    f.read(&mut buffer).expect("buffer overflow");
+    buffer
+}
+
+pub fn print_if_not_eq(a: f32, b: f32) {
+    if a != b {
+        println!("cpu != gpu: {} != {}", a, b)
+    }
+}
+
 pub fn start(options: &Options) {
-    let compiled_shader_modules = maybe_watch(options, None);
-
-    //let compiled_shader_modules = CompiledShaderModules {
-    //    named_spv_modules: vec![(None, include_spirv_raw!("compute_shader.spv"))],
-    //};
-
-    let mut gpu_result = f32::MAX;
-    gpu_result = gpu_result.min(futures::executor::block_on(start_internal(
-        options,
-        &compiled_shader_modules,
-    )));
+    let compiled_shader_modules = maybe_watch(None);
 
     let start = Instant::now();
     let cpu_result = compute_shader::compute(options.size);
     let took = start.elapsed();
-    println!("CPU Took: {took:?}");
-    assert_eq!(gpu_result, cpu_result);
+    println!("CPU Took:\t{took:?}");
+
+    let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
+        options,
+        compiled_shader_modules.named_spv_modules[0].1.clone(),
+    ));
+    println!("rust-gpu Took:\t{:?}", gpu_duration);
+    print_if_not_eq(cpu_result, gpu_result);
+
+    let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
+        options,
+        include_wgsl!("compute_shader.wgsl"),
+    ));
+    println!("wgsl Took:\t{:?}", gpu_duration);
+    print_if_not_eq(cpu_result, gpu_result);
+
+    let src_path = [env!("CARGO_MANIFEST_DIR"), "src", "compute_shader.slang"]
+        .iter()
+        .copied()
+        .collect::<PathBuf>();
+
+    let dst_path = [
+        env!("CARGO_MANIFEST_DIR"),
+        "src",
+        "compute_shader_slang.spv",
+    ]
+    .iter()
+    .copied()
+    .collect::<PathBuf>();
+    let dst_string = dst_path.to_string_lossy().to_string();
+
+    if options.compile_slang {
+        let out = Command::new("slangc")
+            .arg(src_path.to_string_lossy().to_string())
+            //.arg("-O3")
+            .arg("-profile")
+            .arg("sm_5_0")
+            .arg("-stage")
+            .arg("compute")
+            .arg("-entry")
+            .arg("main")
+            .arg("-o")
+            .arg(dst_string.clone())
+            .output()
+            .expect("failed to execute process");
+        if out.stderr.len() > 1 {
+            println!("slangc stderr: {}", String::from_utf8_lossy(&out.stderr));
+        }
+    }
+
+    let slang_spv = load_shader_module(&dst_path);
+
+    let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
+        options,
+        ShaderModuleDescriptor {
+            label: Some(&dst_string),
+            source: util::make_spirv(&slang_spv),
+        },
+    ));
+    println!("slang Took:\t{:?}", gpu_duration);
+    print_if_not_eq(cpu_result, gpu_result);
 }
 
-async fn start_internal(options: &Options, compiled_shader_modules: &CompiledShaderModules) -> f32 {
+async fn start_internal(
+    options: &Options,
+    shader_module: ShaderModuleDescriptor<'_>,
+) -> (Duration, f32) {
     let backends = backend_bits_from_env().unwrap_or(Backends::PRIMARY);
     let instance = Instance::new(InstanceDescriptor {
         backends,
@@ -39,10 +111,7 @@ async fn start_internal(options: &Options, compiled_shader_modules: &CompiledSha
         .await
         .expect("Failed to find an appropriate adapter");
 
-    let mut features = Features::TIMESTAMP_QUERY | Features::TIMESTAMP_QUERY_INSIDE_PASSES;
-    if options.force_spirv_passthru {
-        features |= Features::SPIRV_SHADER_PASSTHROUGH;
-    }
+    let features = Features::TIMESTAMP_QUERY | Features::TIMESTAMP_QUERY_INSIDE_PASSES;
 
     let (device, queue) = adapter
         .request_device(
@@ -58,19 +127,7 @@ async fn start_internal(options: &Options, compiled_shader_modules: &CompiledSha
     drop(instance);
     drop(adapter);
 
-    let entry_point = "main_cs";
-
-    // FIXME(eddyb) automate this decision by default.
-    let module = compiled_shader_modules.spv_module_for_entry_point(entry_point);
-    let module = if options.force_spirv_passthru {
-        unsafe { device.create_shader_module_spirv(&module) }
-    } else {
-        let ShaderModuleDescriptorSpirV { label, source } = module;
-        device.create_shader_module(ShaderModuleDescriptor {
-            label,
-            source: ShaderSource::SpirV(source),
-        })
-    };
+    let module = device.create_shader_module(shader_module);
 
     let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: None,
@@ -108,7 +165,7 @@ async fn start_internal(options: &Options, compiled_shader_modules: &CompiledSha
         label: None,
         layout: Some(&pipeline_layout),
         module: &module,
-        entry_point,
+        entry_point: "main",
     });
 
     let storage_buffer_size = 4;
@@ -186,6 +243,5 @@ async fn start_internal(options: &Options, compiled_shader_modules: &CompiledSha
     drop(data);
     readback_buffer.unmap();
 
-    println!("GPU Took: {:?}", timestamp.unmap(timestamp_slice));
-    *result.first().unwrap()
+    (timestamp.unmap(timestamp_slice), *result.first().unwrap())
 }
