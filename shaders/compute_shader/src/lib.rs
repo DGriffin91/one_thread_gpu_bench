@@ -12,27 +12,78 @@ use spirv_std::{glam, spirv};
 use spirv_std::num_traits::Float;
 use util::hash_noise;
 
-fn intersect(p0: Vec3, p1: Vec3, p2: Vec3, origin: Vec3, direction: Vec3) -> Vec3 {
-    let e1 = p0 - p1;
-    let e2 = p2 - p0;
-    let n = e1.cross(e2);
+pub struct Triangle {
+    pub a: Vec3,
+    pub b: Vec3,
+    pub c: Vec3,
+}
 
-    let c = p0 - origin;
-    let r = direction.cross(c);
-    let inv_det = 1.0 / n.dot(direction);
+impl Triangle {
+    fn random(rng_coord: UVec2, seed: u32) -> Self {
+        Triangle {
+            a: vec3(
+                hash_noise(rng_coord, 0 + seed),
+                hash_noise(rng_coord, 1 + seed),
+                hash_noise(rng_coord, 2 + seed),
+            ) * 2.0
+                - 1.0,
+            b: vec3(
+                hash_noise(rng_coord, 3 + seed),
+                hash_noise(rng_coord, 4 + seed),
+                hash_noise(rng_coord, 5 + seed),
+            ) * 2.0
+                - 1.0,
+            c: vec3(
+                hash_noise(rng_coord, 6 + seed),
+                hash_noise(rng_coord, 7 + seed),
+                hash_noise(rng_coord, 8 + seed),
+            ) * 2.0
+                - 1.0,
+        }
+    }
 
-    let uvt = vec3(r.dot(e2), r.dot(e1), n.dot(c)) * inv_det;
+    pub fn intersect(&self, ray: Ray) -> Vec3 {
+        let e1 = self.a - self.b;
+        let e2 = self.c - self.a;
+        let n = e1.cross(e2);
 
-    //if (uvt.x > 0.0) as u32
-    //    & (uvt.y > 0.0) as u32
-    //    & (uvt.z > 0.0) as u32
-    //    & (uvt.x + uvt.y < 1.0) as u32
-    //    == 1
-    //{
-    if uvt.x > 0.0 && uvt.y > 0.0 && uvt.z > 0.0 && uvt.x + uvt.y < 1.0 {
-        uvt
-    } else {
-        vec3(f32::MAX, f32::MAX, f32::MAX)
+        let c = self.a - ray.origin;
+        let r = ray.direction.cross(c);
+        let inv_det = 1.0 / n.dot(ray.direction);
+
+        let uvt = vec3(r.dot(e2), r.dot(e1), n.dot(c)) * inv_det;
+
+        if (uvt.x > 0.0) & (uvt.y > 0.0) & (uvt.z > 0.0) & (uvt.x + uvt.y < 1.0) {
+            return uvt;
+        }
+
+        return vec3(f32::MAX, f32::MAX, f32::MAX);
+    }
+}
+
+pub struct Ray {
+    pub origin: Vec3,
+    pub direction: Vec3,
+}
+
+impl Ray {
+    fn random(rng_coord: UVec2, seed: u32) -> Self {
+        let origin = vec3(
+            hash_noise(rng_coord, 0 + seed),
+            hash_noise(rng_coord, 1 + seed),
+            hash_noise(rng_coord, 2 + seed),
+        ) * 2.0
+            - 1.0;
+        let direction = vec3(
+            hash_noise(rng_coord, 3 + seed),
+            hash_noise(rng_coord, 4 + seed),
+            hash_noise(rng_coord, 5 + seed),
+        ) * 2.0
+            - 1.0;
+        Ray {
+            origin,
+            direction: direction.normalize(),
+        }
     }
 }
 
@@ -41,40 +92,9 @@ pub fn compute(size: u32) -> f32 {
     for x in 0..size {
         for y in 0..size {
             let coord = uvec2(x, y);
-            let a = vec3(
-                hash_noise(coord, 0),
-                hash_noise(coord, 1),
-                hash_noise(coord, 2),
-            ) * 2.0
-                - 1.0;
-            let b = vec3(
-                hash_noise(coord, 3),
-                hash_noise(coord, 4),
-                hash_noise(coord, 5),
-            ) * 2.0
-                - 1.0;
-            let c = vec3(
-                hash_noise(coord, 6),
-                hash_noise(coord, 7),
-                hash_noise(coord, 8),
-            ) * 2.0
-                - 1.0;
-            let origin = vec3(
-                hash_noise(coord, 9),
-                hash_noise(coord, 10),
-                hash_noise(coord, 11),
-            ) * 2.0
-                - 1.0;
-            let direction = vec3(
-                hash_noise(coord, 12),
-                hash_noise(coord, 13),
-                hash_noise(coord, 14),
-            ) * 2.0
-                - 1.0;
-            sum += intersect(a, b, c, origin, direction.normalize())
-                .y
-                .min(100.0)
-                .sin();
+            let tri = Triangle::random(coord, 0);
+            let ray = Ray::random(coord, 9);
+            sum += tri.intersect(ray).y.min(100.0).sin()
         }
     }
     return sum;

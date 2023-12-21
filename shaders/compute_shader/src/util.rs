@@ -157,6 +157,17 @@ pub fn uhash(a: u32, b: u32) -> u32 {
     x
 }
 
+//pub fn uhash(a: u32, b: u32) -> u32 {
+//    let mut x = (a * 1597334673u32) ^ (b * 3812015801u32);
+//    // from https://nullprogram.com/blog/2018/07/31/
+//    x = x ^ (x >> 16u32);
+//    x = x * 0x7feb352du32;
+//    x = x ^ (x >> 15u32);
+//    x = x * 0x846ca68bu32;
+//    x = x ^ (x >> 16u32);
+//    x
+//}
+
 pub fn unormf(n: u32) -> f32 {
     n as f32 * (1.0 / 0xffffffffu32 as f32)
 }
