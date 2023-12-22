@@ -185,7 +185,8 @@ macro_rules! for_ {
             loop {
                 $($body)*
                 $inc;
-                if !($cond) {
+                if ($cond) {
+                } else {
                     break;
                 }
             }
