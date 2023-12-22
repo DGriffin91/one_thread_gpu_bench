@@ -89,14 +89,24 @@ impl Ray {
 
 pub fn compute(size: u32) -> f32 {
     let mut sum = 0.0;
-    for x in 0..size {
-        for y in 0..size {
+    //for x in 0..size {
+    //    for y in 0..size {
+    //        let coord = uvec2(x, y);
+    //        let tri = Triangle::random(coord, 0);
+    //        let ray = Ray::random(coord, 9);
+    //        sum += tri.intersect(ray).y.min(100.0).sin();
+    //    }
+    //}
+
+    for_!(x in 0..size {
+        for_!(y in 0..size {
             let coord = uvec2(x, y);
             let tri = Triangle::random(coord, 0);
             let ray = Ray::random(coord, 9);
-            sum += tri.intersect(ray).y.min(100.0).sin()
-        }
-    }
+            sum += tri.intersect(ray).y.min(100.0).sin();
+        });
+    });
+
     return sum;
 }
 

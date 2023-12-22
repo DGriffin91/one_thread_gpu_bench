@@ -176,3 +176,16 @@ pub fn hash_noise(ucoord: UVec2, frame: u32) -> f32 {
     let urnd = uhash(ucoord.x, (ucoord.y << 11u32) + frame);
     unormf(urnd)
 }
+
+#[macro_export]
+macro_rules! for_ {
+    ($var:ident in $start:tt..$end:tt { $($body:tt)* }) => {
+        {
+            let mut $var = $start;
+            while $var < ($end) {
+                $($body)*
+                $var += 1;
+            }
+        }
+    };
+}

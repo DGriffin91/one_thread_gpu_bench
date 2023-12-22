@@ -15,6 +15,11 @@ fn maybe_watch(
     use spirv_builder::{CompileResult, MetadataPrintout, SpirvBuilder};
     use std::path::PathBuf;
 
+    std::env::set_var(
+        "RUSTGPU_CODEGEN_ARGS",
+        "--dump-spirt-passes=$PWD/spirt-passes --spirt-passes=reduce,fuse_selects",
+    );
+
     let crate_path = [env!("CARGO_MANIFEST_DIR"), "shaders", "compute_shader"]
         .iter()
         .copied()
