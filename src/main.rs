@@ -36,14 +36,10 @@ fn maybe_watch(
         builder.build().unwrap()
     };
     fn handle_compile_result(compile_result: CompileResult) -> CompiledShaderModules {
-        let spv_path = [
-            env!("CARGO_MANIFEST_DIR"),
-            "shaders",
-            "compute_shader_rust.spv",
-        ]
-        .iter()
-        .copied()
-        .collect::<PathBuf>();
+        let spv_path = [env!("CARGO_MANIFEST_DIR"), "src", "compute_shader_rust.spv"]
+            .iter()
+            .copied()
+            .collect::<PathBuf>();
         let glsl_path = spv_path.with_extension("glsl");
         let _ = std::fs::remove_file(&glsl_path);
         let mut cmd = Command::new("spirv-cross");

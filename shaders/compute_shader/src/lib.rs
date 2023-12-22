@@ -103,21 +103,12 @@ pub fn compute2(size: u32) -> f32 {
 }
 
 pub fn compute(settings: &UVec4) -> u32 {
-    //for x in 0..size {
-    //    for y in 0..size {
-    //        let coord = uvec2(x, y);
-    //        sum += hash_noise(coord, 0);
-    //    }
-    //}
-
     let mut hash = settings.x;
-
-    for_!(i in 0..(settings.y) {
-        for_!(j in 0..(settings.z) {
+    for_!((let mut i = 0; i < settings.y; i += 1) {
+        for_!((let mut j = 0; j < settings.z; j += 1) {
             hash = hash * 1597334673;
         });
     });
-
     return hash;
 }
 

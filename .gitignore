@@ -4,3 +4,4 @@ Cargo.lock
 *.spirt
 *.html
 /spirt-passes
+*.spv

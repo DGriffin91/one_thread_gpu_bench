@@ -45,6 +45,12 @@ pub fn start(options: &Options) {
     print_if_not_eq(cpu_result, gpu_result);
 
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+
+    let rust_spv = src.join("compute_shader_rust.spv");
+    let rust_spv_opt = src.join("compute_shader_rust.opt.spv");
+    spirv_opt(&rust_spv, &rust_spv_opt);
+    run_spv(&rust_spv_opt, options, cpu_result, "rust > opt");
+
     let wgsl = src.join("compute_shader.wgsl");
     let wgsl_spv = src.join("compute_shader.wgsl.spv");
     let wgsl_spv_opt = src.join("compute_shader.wgsl.opt.spv");
