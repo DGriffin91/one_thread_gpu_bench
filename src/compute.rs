@@ -37,6 +37,12 @@ pub fn start(options: &Options) {
     let took = start.elapsed();
     println!("CPU Took:\t{took:?}");
 
+    let (gpu_duration, _gpu_result) = futures::executor::block_on(start_internal(
+        options,
+        compiled_shader_modules.named_spv_modules[0].1.clone(),
+    ));
+    println!("rust-gpu warm up Took:\t{:?}", gpu_duration);
+
     let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
         options,
         compiled_shader_modules.named_spv_modules[0].1.clone(),
