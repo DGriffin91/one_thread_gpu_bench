@@ -59,17 +59,17 @@ struct Ray
 
 struct Triangle
 {
-    float3 p0;
-    float3 p1;
-    float3 p2;
+    float3 a;
+    float3 b;
+    float3 c;
 
     float3 intersect(Ray ray)
     {
-        let e1 = p0 - p1;
-        let e2 = p2 - p0;
+        let e1 = a - b;
+        let e2 = c - a;
         let n = cross(e1, e2);
 
-        let c = p0 - ray.origin;
+        let c = a - ray.origin;
         let r = cross(ray.direction, c);
         let inv_det = 1.0 / dot(n, ray.direction);
 
@@ -90,59 +90,114 @@ struct Triangle
     static Triangle random(uint2 coord, uint seed)
     {
         var tri : Triangle;
-        tri.p0 = float3(
-                     hash_noise(coord, seed + 0u),
-                     hash_noise(coord, seed + 1u),
-                     hash_noise(coord, seed + 2u)) *
-                     2.0 -
-                 1.0;
-        tri.p1 = float3(
-                     hash_noise(coord, seed + 3u),
-                     hash_noise(coord, seed + 4u),
-                     hash_noise(coord, seed + 5u)) *
-                     2.0 -
-                 1.0;
-        tri.p2 = float3(
-                     hash_noise(coord, seed + 6u),
-                     hash_noise(coord, seed + 7u),
-                     hash_noise(coord, seed + 8u)) *
-                     2.0 -
-                 1.0;
+        tri.a = float3(
+                    hash_noise(coord, seed + 0u),
+                    hash_noise(coord, seed + 1u),
+                    hash_noise(coord, seed + 2u)) *
+                    2.0 -
+                1.0;
+        tri.b = float3(
+                    hash_noise(coord, seed + 3u),
+                    hash_noise(coord, seed + 4u),
+                    hash_noise(coord, seed + 5u)) *
+                    2.0 -
+                1.0;
+        tri.c = float3(
+                    hash_noise(coord, seed + 6u),
+                    hash_noise(coord, seed + 7u),
+                    hash_noise(coord, seed + 8u)) *
+                    2.0 -
+                1.0;
         return tri;
     }
 }
 
+[numthreads(1, 1, 1)]
+void main(uint3 invocation_id: SV_DispatchThreadID)
+{
+
+    var hash = (float)settings.x;
+    for (uint x = 0u; x < settings.y; x++)
+    {
+        for (uint y = 0u; y < settings.z; y++)
+        {
+            uint2 coord = uint2(x, y);
+            let tri = Triangle::random(coord, 0u);
+            let ray = Ray::random(coord, 9u);
+            hash += sin(min(tri.intersect(ray).y, 100.0));
+        }
+    }
+
+    uint index = invocation_id.x;
+    data[index] = (uint)hash;
+}
+
 //[numthreads(1, 1, 1)]
-//void main(uint3 invocation_id: SV_DispatchThreadID)
+// void main(uint3 invocation_id: SV_DispatchThreadID)
 //{
-//
-//    var sum = 0.0;
-//    for (uint x = 0u; x < settings.x; x++)
+//    float hash = (float)settings.x;
+//    for (uint x = 0u; x < settings.y; x++)
 //    {
-//        for (uint y = 0u; y < settings.x; y++)
+//        for (uint y = 0u; y < settings.z; y++)
 //        {
 //            uint2 coord = uint2(x, y);
-//            let tri = Triangle::random(coord, 0u);
-//            let ray = Ray::random(coord, 9u);
-//            sum += sin(min(tri.intersect(ray).y, 100.0));
+//            let a = float3(
+//                hash_noise(coord, 0),
+//                hash_noise(coord, 1),
+//                hash_noise(coord, 2));
+//            hash += dot(a, float3(1.0, 2.0, 3.0));
 //        }
 //    }
-//
-//    uint index = invocation_id.x;
-//    data[index] = sum;
+//    data[invocation_id.x] = (uint)hash;
 //}
 
+/*
 
 [numthreads(1, 1, 1)]
 void main(uint3 invocation_id: SV_DispatchThreadID)
 {
-    uint hash = settings.x;
-    for (uint i = 0u; i < settings.y; i++)
+    float hash = (float)settings.x;
+    for (uint x = 0u; x < settings.y; x++)
     {
-        for (uint j = 0u; j < settings.z; j++)
+        for (uint y = 0u; y < settings.z; y++)
         {
-            hash = (hash * 1597334673);
+            uint2 coord = uint2(x, y);
+            let tri = Triangle::random(coord, 0u);
+            let ray = Ray::random(coord, 9u);
+            hash += dot(tri.a, ray.origin) + dot(tri.b, ray.origin) + dot(tri.a, ray.origin) + dot(tri.c, ray.direction);
         }
     }
-    data[invocation_id.x] = hash;
+    data[invocation_id.x] = (uint)hash;
 }
+
+*/
+
+// Eq perf now
+// [numthreads(1, 1, 1)]
+// void main(uint3 invocation_id: SV_DispatchThreadID)
+// {
+//     float hash = (float)settings.x;
+//     for (uint x = 0u; x < settings.y; x++)
+//     {
+//         for (uint y = 0u; y < settings.z; y++)
+//         {
+//             uint2 coord = uint2(x, y);
+//             hash += hash_noise(coord, 0);
+//         }
+//     }
+//     data[invocation_id.x] = (uint)hash;
+// }
+
+//[numthreads(1, 1, 1)]
+// void main(uint3 invocation_id: SV_DispatchThreadID)
+//{
+//    uint hash = settings.x;
+//    for (uint i = 0u; i < settings.y; i++)
+//    {
+//        for (uint j = 0u; j < settings.z; j++)
+//        {
+//            hash = (hash * 1597334673);
+//        }
+//    }
+//    data[invocation_id.x] = hash;
+//}

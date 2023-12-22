@@ -46,14 +46,128 @@ fn intersect(p0: vec3<f32>, p1: vec3<f32>, p2: vec3<f32>, origin: vec3<f32>, dir
     return vec3(F32_MAX);
 }
 
+//@compute @workgroup_size(1, 1, 1)
+//fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+//    var hash = f32(settings.x);
+//    for (var x = 0u; x < settings.y; x += 1u) {
+//        for (var y = 0u; y < settings.z; y += 1u) {
+//            let coord = vec2(x, y);
+//            let a = vec3(
+//                hash_noise(coord, 0u),
+//                hash_noise(coord, 1u),
+//                hash_noise(coord, 2u),
+//            );
+//            hash += dot(a, vec3(1.0,2.0,3.0));
+//        }
+//    }
+//    data[invocation_id.x] = u32(hash);
+//}
+
+/*
 
 @compute @workgroup_size(1, 1, 1)
 fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    var hash = settings.x;
-    for (var i = 0u; i < settings.y; i += 1u) {
-        for (var j = 0u; j < settings.z; j += 1u) {
-            hash = (hash * 1597334673u);
+    var hash = f32(settings.x);
+    for (var x = 0u; x < settings.y; x += 1u) {
+        for (var y = 0u; y < settings.z; y += 1u) {
+            let coord = vec2(x, y);
+
+            let a = vec3(
+                hash_noise(coord, 0u),
+                hash_noise(coord, 1u),
+                hash_noise(coord, 2u),
+            ) * 2.0 - 1.0;
+            let b = vec3(
+                hash_noise(coord, 3u),
+                hash_noise(coord, 4u),
+                hash_noise(coord, 5u),
+            ) * 2.0 - 1.0;
+            let c = vec3(
+                hash_noise(coord, 6u),
+                hash_noise(coord, 7u),
+                hash_noise(coord, 8u),
+            ) * 2.0 - 1.0;
+            let origin = vec3(
+                hash_noise(coord, 9u),
+                hash_noise(coord, 10u),
+                hash_noise(coord, 11u),
+            ) * 2.0 - 1.0;
+            let direction = normalize(vec3(
+                hash_noise(coord, 12u),
+                hash_noise(coord, 13u),
+                hash_noise(coord, 14u),
+            ) * 2.0 - 1.0);
+
+            hash += dot(a, origin) + dot(b, origin) + dot(a, origin) + dot(c, direction);
         }
     }
-    data[invocation_id.x] = hash;
+    data[invocation_id.x] = u32(hash);
 }
+
+*/
+
+
+@compute @workgroup_size(1, 1, 1)
+fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+    var hash = f32(settings.x);
+    for (var x = 0u; x < settings.y; x += 1u) {
+        for (var y = 0u; y < settings.z; y += 1u) {
+            let coord = vec2(x, y);
+
+            let a = vec3(
+                hash_noise(coord, 0u),
+                hash_noise(coord, 1u),
+                hash_noise(coord, 2u),
+            ) * 2.0 - 1.0;
+            let b = vec3(
+                hash_noise(coord, 3u),
+                hash_noise(coord, 4u),
+                hash_noise(coord, 5u),
+            ) * 2.0 - 1.0;
+            let c = vec3(
+                hash_noise(coord, 6u),
+                hash_noise(coord, 7u),
+                hash_noise(coord, 8u),
+            ) * 2.0 - 1.0;
+            let origin = vec3(
+                hash_noise(coord, 9u),
+                hash_noise(coord, 10u),
+                hash_noise(coord, 11u),
+            ) * 2.0 - 1.0;
+            let direction = normalize(vec3(
+                hash_noise(coord, 12u),
+                hash_noise(coord, 13u),
+                hash_noise(coord, 14u),
+            ) * 2.0 - 1.0);
+
+            hash += sin(min(intersect(a, b, c, origin, direction).y, 100.0));
+        }
+    }
+    data[invocation_id.x] = u32(hash);
+}
+
+
+// Eq perf now
+// @compute @workgroup_size(1, 1, 1)
+// fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+//     var hash = f32(settings.x);
+//     for (var x = 0u; x < settings.y; x += 1u) {
+//         for (var y = 0u; y < settings.z; y += 1u) {
+//             let coord = vec2(x, y);
+//             hash += hash_noise(coord, 0u);
+//         }
+//     }
+//     data[invocation_id.x] = u32(hash);
+// }
+
+
+//@compute @workgroup_size(1, 1, 1)
+//fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+//    var hash = settings.x;
+//    for (var i = 0u; i < settings.y; i += 1u) {
+//        for (var j = 0u; j < settings.z; j += 1u) {
+//            hash = (hash * 1597334673u);
+//        }
+//    }
+//    data[invocation_id.x] = hash;
+//}

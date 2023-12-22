@@ -37,6 +37,12 @@ pub fn start(options: &Options) {
     let cpu_result = compute_shader::compute(&UVec4::splat(options.size));
     println!("{}\trust cpu", to_ms_round(start.elapsed()));
 
+    let (gpu_duration, _gpu_result) = futures::executor::block_on(start_internal(
+        options,
+        compiled_shader_modules.named_spv_modules[0].1.clone(),
+    ));
+    println!("{}\trust gpu warm up", to_ms_round(gpu_duration));
+
     let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
         options,
         compiled_shader_modules.named_spv_modules[0].1.clone(),
