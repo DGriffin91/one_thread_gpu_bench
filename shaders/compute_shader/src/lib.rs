@@ -98,8 +98,8 @@ pub fn compute(size: u32) -> f32 {
     //    }
     //}
 
-    for_!(x in 0..size {
-        for_!(y in 0..size {
+    for_!((let mut x = 0; x < size; x += 1) {
+        for_!((let mut y = 0; y < size; y += 1) {
             let coord = uvec2(x, y);
             let tri = Triangle::random(coord, 0);
             let ray = Ray::random(coord, 9);

@@ -179,13 +179,16 @@ pub fn hash_noise(ucoord: UVec2, frame: u32) -> f32 {
 
 #[macro_export]
 macro_rules! for_ {
-    ($var:ident in $start:tt..$end:tt { $($body:tt)* }) => {
-        {
-            let mut $var = $start;
-            while $var < ($end) {
+    (($start:stmt; $cond:expr; $inc:expr) { $($body:tt)* }) => {{
+        $start
+        if ($cond) {
+            loop {
                 $($body)*
-                $var += 1;
+                $inc;
+                if !($cond) {
+                    break;
+                }
             }
         }
-    };
+    }};
 }
