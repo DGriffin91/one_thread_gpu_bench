@@ -1,5 +1,5 @@
 [[vk::binding(0, 0)]]
-RWStructuredBuffer<float> data : register(u0);
+RWStructuredBuffer<uint> data : register(u0);
 [[vk::binding(1, 0)]]
 cbuffer SettingsBuffer : register(b1)
 {
@@ -112,22 +112,37 @@ struct Triangle
     }
 }
 
+//[numthreads(1, 1, 1)]
+//void main(uint3 invocation_id: SV_DispatchThreadID)
+//{
+//
+//    var sum = 0.0;
+//    for (uint x = 0u; x < settings.x; x++)
+//    {
+//        for (uint y = 0u; y < settings.x; y++)
+//        {
+//            uint2 coord = uint2(x, y);
+//            let tri = Triangle::random(coord, 0u);
+//            let ray = Ray::random(coord, 9u);
+//            sum += sin(min(tri.intersect(ray).y, 100.0));
+//        }
+//    }
+//
+//    uint index = invocation_id.x;
+//    data[index] = sum;
+//}
+
+
 [numthreads(1, 1, 1)]
 void main(uint3 invocation_id: SV_DispatchThreadID)
 {
-
-    var sum = 0.0;
-    for (uint x = 0u; x < settings.x; x++)
+    uint hash = settings.x;
+    for (uint i = 0u; i < settings.y; i++)
     {
-        for (uint y = 0u; y < settings.x; y++)
+        for (uint j = 0u; j < settings.z; j++)
         {
-            uint2 coord = uint2(x, y);
-            let tri = Triangle::random(coord, 0u);
-            let ray = Ray::random(coord, 9u);
-            sum += sin(min(tri.intersect(ray).y, 100.0));
+            hash = (hash * 1597334673);
         }
     }
-
-    uint index = invocation_id.x;
-    data[index] = sum;
+    data[invocation_id.x] = hash;
 }

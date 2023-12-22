@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, process::Command};
 use structopt::StructOpt;
 use wgpu::*;
 
@@ -14,6 +14,11 @@ fn maybe_watch(
 ) -> CompiledShaderModules {
     use spirv_builder::{CompileResult, MetadataPrintout, SpirvBuilder};
     use std::path::PathBuf;
+
+    std::env::set_var(
+        "RUSTGPU_CODEGEN_ARGS",
+        "--dump-spirt-passes=$PWD/spirt-passes --spirt-passes=reduce,fuse_selects",
+    );
 
     let crate_path = [env!("CARGO_MANIFEST_DIR"), "shaders", "compute_shader"]
         .iter()
@@ -31,6 +36,31 @@ fn maybe_watch(
         builder.build().unwrap()
     };
     fn handle_compile_result(compile_result: CompileResult) -> CompiledShaderModules {
+        let spv_path = [
+            env!("CARGO_MANIFEST_DIR"),
+            "shaders",
+            "compute_shader_rust.spv",
+        ]
+        .iter()
+        .copied()
+        .collect::<PathBuf>();
+        let glsl_path = spv_path.with_extension("glsl");
+        let _ = std::fs::remove_file(&glsl_path);
+        let mut cmd = Command::new("spirv-cross");
+        cmd.arg(&spv_path).arg("--output").arg(&glsl_path);
+        let out = cmd.output().expect("failed to execute process");
+        if out.stderr.len() > 1 {
+            println!(
+                "spirv-cross stderr: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        Command::new("spv-lower-print")
+            .arg(&spv_path)
+            .output()
+            .expect("failed to execute process");
+
+        std::fs::copy(compile_result.module.unwrap_single(), spv_path).unwrap();
         let load_spv_module = |path| {
             let data = std::fs::read(path).unwrap();
             let spirv = Cow::Owned(util::make_spirv_raw(&data).into_owned());

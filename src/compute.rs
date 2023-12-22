@@ -1,4 +1,5 @@
 use crate::{maybe_watch, timestamp::Timestamp, Options};
+use spirv_std::glam::UVec4;
 
 use std::{
     convert::TryInto,
@@ -23,7 +24,7 @@ fn load_shader_module(path: &Path) -> Vec<u8> {
     buffer
 }
 
-pub fn print_if_not_eq(a: f32, b: f32) {
+pub fn print_if_not_eq(a: u32, b: u32) {
     if a != b {
         println!("cpu != gpu: {} != {}", a, b)
     }
@@ -33,30 +34,42 @@ pub fn start(options: &Options) {
     let compiled_shader_modules = maybe_watch(None);
 
     let start = Instant::now();
-    let cpu_result = compute_shader::compute(options.size);
-    let took = start.elapsed();
-    println!("CPU Took:\t{took:?}");
+    let cpu_result = compute_shader::compute(&UVec4::splat(options.size));
+    println!("{}\trust cpu", to_ms_round(start.elapsed()));
 
     let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
         options,
         compiled_shader_modules.named_spv_modules[0].1.clone(),
     ));
-    println!("rust-gpu Took:\t{:?}", gpu_duration);
+    println!("{}\trust gpu", to_ms_round(gpu_duration));
     print_if_not_eq(cpu_result, gpu_result);
 
-    let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let wgsl = src.join("compute_shader.wgsl");
+    let wgsl_spv = src.join("compute_shader.wgsl.spv");
+    let wgsl_spv_opt = src.join("compute_shader.wgsl.opt.spv");
+
+    naga(&wgsl, &wgsl_spv);
+    run_spv(&wgsl_spv, options, cpu_result, "wgsl");
+    spirv_opt(&wgsl_spv, &wgsl_spv_opt);
+    run_spv(&wgsl_spv_opt, options, cpu_result, "wgsl > spirv-opt");
+
+    generate_spirt(&wgsl_spv_opt);
+    let wgsl_spv_opt_link = src.join("compute_shader.wgsl.opt.link.spv");
+    //spv_lower_print(&wgsl_spv_opt_link);
+    run_spv(
+        &wgsl_spv_opt_link,
         options,
-        include_wgsl!("compute_shader.wgsl"),
-    ));
-    println!("wgsl Took:\t{:?}", gpu_duration);
-    print_if_not_eq(cpu_result, gpu_result);
+        cpu_result,
+        "wgsl > spirv-opt > spirt",
+    );
 
     let src_path = [env!("CARGO_MANIFEST_DIR"), "src", "compute_shader.slang"]
         .iter()
         .copied()
         .collect::<PathBuf>();
 
-    let dst_path = [
+    let slang_spv_path = [
         env!("CARGO_MANIFEST_DIR"),
         "src",
         "compute_shader_slang.spv",
@@ -64,44 +77,131 @@ pub fn start(options: &Options) {
     .iter()
     .copied()
     .collect::<PathBuf>();
-    let dst_string = dst_path.to_string_lossy().to_string();
 
-    if options.compile_slang {
-        let out = Command::new("slangc")
-            .arg(src_path.to_string_lossy().to_string())
-            //.arg("-O3")
-            .arg("-profile")
-            .arg("sm_5_0")
-            .arg("-stage")
-            .arg("compute")
-            .arg("-entry")
-            .arg("main")
-            .arg("-o")
-            .arg(dst_string.clone())
-            .output()
-            .expect("failed to execute process");
-        if out.stderr.len() > 1 {
-            println!("slangc stderr: {}", String::from_utf8_lossy(&out.stderr));
-        }
+    slangc(src_path, &slang_spv_path);
+
+    run_spv(&slang_spv_path, options, cpu_result, "slang");
+    spv_lower_print(&slang_spv_path);
+
+    let slang_spv_opt_path = slang_spv_path.with_file_name("compute_shader_slang.opt.spv");
+
+    spirv_opt(&slang_spv_path, &slang_spv_opt_path);
+
+    run_spv(
+        &slang_spv_opt_path,
+        options,
+        cpu_result,
+        "slang > spirv-opt",
+    );
+
+    spv_lower_print(&slang_spv_opt_path);
+
+    generate_spirt(&slang_spv_opt_path);
+
+    let slang_naga_link_spv_path =
+        slang_spv_path.with_file_name("compute_shader_slang.opt.link.spv");
+
+    run_spv(
+        &slang_naga_link_spv_path,
+        options,
+        cpu_result,
+        "slang > spirv-opt > spirt",
+    );
+}
+
+fn slangc(src_path: PathBuf, slang_spv_path: &PathBuf) {
+    let out = Command::new("slangc")
+        .arg(src_path)
+        .arg("-O3")
+        .arg("-profile")
+        .arg("sm_5_0")
+        .arg("-stage")
+        .arg("compute")
+        .arg("-entry")
+        .arg("main")
+        .arg("-o")
+        .arg(slang_spv_path)
+        .output()
+        .expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        println!("slangc stderr: {}", String::from_utf8_lossy(&out.stderr));
     }
+}
 
-    let slang_spv = load_shader_module(&dst_path);
+fn spirv_opt(input: &Path, output: &Path) {
+    let out = Command::new("spirv-opt")
+        .arg("-O")
+        .arg(&input)
+        .arg("-o")
+        .arg(output)
+        .output()
+        .expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        println!("spirv-opt stderr: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
 
+fn generate_spirt(path: &Path) {
+    let out = Command::new("spv-lower-link-lift")
+        .args([&path])
+        .output()
+        .expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        // Noisy
+        //println!(
+        //    "spv-lower-link-lift stderr: {}",
+        //    String::from_utf8_lossy(&out.stderr)
+        //);
+    }
+}
+
+fn naga(input: &Path, output: &Path) {
+    let out = Command::new("naga")
+        .args([input, output])
+        .output()
+        .expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        println!("naga stderr: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
+fn spv_lower_print(path: &Path) {
+    let out = Command::new("spv-lower-print")
+        .arg(&path)
+        .output()
+        .expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        println!("spv-lower-print: {}", String::from_utf8_lossy(&out.stderr));
+    }
+}
+
+fn run_spv(
+    slang_spv_path: &Path,
+    options: &Options,
+    cpu_result: u32,
+    text: &str,
+) -> (Duration, u32) {
+    let slang_spv = load_shader_module(slang_spv_path);
     let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
         options,
         ShaderModuleDescriptor {
-            label: Some(&dst_string),
+            label: None,
             source: util::make_spirv(&slang_spv),
         },
     ));
-    println!("slang Took:\t{:?}", gpu_duration);
+    println!("{}\t{}", to_ms_round(gpu_duration), text);
     print_if_not_eq(cpu_result, gpu_result);
+    (gpu_duration, gpu_result)
+}
+
+fn to_ms_round(d: Duration) -> String {
+    format!("{:.1}ms", d.as_secs_f32() * 1000.0)
 }
 
 async fn start_internal(
     options: &Options,
     shader_module: ShaderModuleDescriptor<'_>,
-) -> (Duration, f32) {
+) -> (Duration, u32) {
     let backends = backend_bits_from_env().unwrap_or(Backends::PRIMARY);
     let instance = Instance::new(InstanceDescriptor {
         backends,
@@ -238,7 +338,7 @@ async fn start_internal(
     let data = buffer_slice.get_mapped_range();
     let result = data
         .chunks_exact(4)
-        .map(|b| f32::from_ne_bytes(b.try_into().unwrap()))
+        .map(|b| u32::from_ne_bytes(b.try_into().unwrap()))
         .collect::<Vec<_>>();
     drop(data);
     readback_buffer.unmap();
