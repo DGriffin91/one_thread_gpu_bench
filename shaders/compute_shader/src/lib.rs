@@ -54,6 +54,7 @@ impl Triangle {
 
         let uvt = vec3(r.dot(e2), r.dot(e1), n.dot(c)) * inv_det;
 
+        //if (uvt.x > 0.0) && (uvt.y > 0.0) && (uvt.z > 0.0) && (uvt.x + uvt.y < 1.0) {
         if (uvt.x > 0.0) & (uvt.y > 0.0) & (uvt.z > 0.0) & (uvt.x + uvt.y < 1.0) {
             uvt
         } else {
@@ -88,23 +89,24 @@ impl Ray {
     }
 }
 
-//pub fn compute(settings: &UVec4) -> u32 {
-//    let mut hash = settings.x as f32;
-//    for_!((let mut x = 0; x < settings.y; x += 1) {
-//        for_!((let mut y = 0; y < settings.z; y += 1) {
-//            let coord = uvec2(x, y);
-//            let a = vec3(
-//                hash_noise(coord, 0),
-//                hash_noise(coord, 1),
-//                hash_noise(coord, 2),
-//            );
-//
-//            hash += a.dot(vec3(1.0, 2.0, 3.0));
-//        });
-//    });
-//
-//    return hash as u32;
-//}
+////pub fn compute(settings: &UVec4) -> u32 {
+////    let mut hash = settings.x as f32;
+////    for_!((let mut x = 0; x < settings.y; x += 1) {
+////        for_!((let mut y = 0; y < settings.z; y += 1) {
+////            let coord = uvec2(x, y);
+////            let a = vec3(
+////                hash_noise(coord, 0),
+////                hash_noise(coord, 1),
+////                hash_noise(coord, 2),
+////            );
+////
+////            //hash += a.dot(vec3(1.0, 2.0, 3.0));
+////            let b = a * vec3(1.0, 2.0, 3.0);
+////            hash += b.x + b.y + b.z;
+////        });
+////    });
+////    return hash as u32;
+////}
 
 //pub fn compute(settings: &UVec4) -> u32 {
 //    let mut hash = settings.x as f32;
@@ -136,6 +138,7 @@ impl Ray {
 //    return hash as u32;
 //}
 
+// FULL
 pub fn compute(settings: &UVec4) -> u32 {
     let mut sum = settings.x as f32;
     for_!((let mut x = 0; x < settings.y; x += 1) {
@@ -179,27 +182,25 @@ pub fn compute(settings: &UVec4) -> u32 {
 //}
 
 // Eq perf now
-// pub fn compute(settings: &UVec4) -> u32 {
-//     let mut hash = settings.x as f32;
-//     for_!((let mut x = 0; x < settings.y; x += 1) {
-//         for_!((let mut y = 0; y < settings.z; y += 1) {
-//             let coord = uvec2(x, y);
-//             hash += hash_noise(coord, 0);
-//         });
-//     });
-//     return hash as u32;
-// }
+//pub fn compute(settings: &UVec4) -> u32 {
+//    let mut hash = settings.x as f32;
+//    for_!((let mut x = 0; x < settings.y; x += 1) {
+//        for_!((let mut y = 0; y < settings.z; y += 1) {
+//            let coord = uvec2(x, y);
+//            hash += hash_noise(coord, 0);
+//        });
+//    });
+//    return hash as u32;
+//}
 
-// Eq perf now
-// pub fn compute(settings: &UVec4) -> u32 {
-//     let mut hash = settings.x;
-//     for_!((let mut i = 0; i < settings.y; i += 1) {
-//         for_!((let mut j = 0; j < settings.z; j += 1) {
-//             hash = hash * 1597334673;
-//         });
-//     });
-//     return hash;
-// }
+// Eq perf now on rtx
+//pub fn compute(settings: &UVec4) -> u32 {
+//    let mut hash = settings.x;
+//    for_!((let mut i = 0; i < settings.y * settings.z; i += 1) {
+//        hash = hash * 1597334673;
+//    });
+//    return hash;
+//}
 
 // LocalSize/numthreads of (x = 1, y = 1, z = 1)
 #[spirv(compute(threads(1)))]

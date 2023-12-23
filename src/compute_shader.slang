@@ -112,6 +112,8 @@ struct Triangle
     }
 }
 
+// FULL
+
 [numthreads(1, 1, 1)]
 void main(uint3 invocation_id: SV_DispatchThreadID)
 {
@@ -128,28 +130,43 @@ void main(uint3 invocation_id: SV_DispatchThreadID)
         }
     }
 
+    // uint x = 0u;
+    // do
+    //{
+    //     uint y = 0u;
+    //     do
+    //     {
+    //         uint2 coord = uint2(x, y);
+    //         let tri = Triangle::random(coord, 0u);
+    //         let ray = Ray::random(coord, 9u);
+    //         hash += sin(min(tri.intersect(ray).y, 100.0));
+    //         y++;
+    //     } while (y < settings.z);
+    //     x++;
+    // } while (x < settings.y);
+
     uint index = invocation_id.x;
     data[index] = (uint)hash;
 }
 
-//[numthreads(1, 1, 1)]
-// void main(uint3 invocation_id: SV_DispatchThreadID)
-//{
-//    float hash = (float)settings.x;
-//    for (uint x = 0u; x < settings.y; x++)
-//    {
-//        for (uint y = 0u; y < settings.z; y++)
-//        {
-//            uint2 coord = uint2(x, y);
-//            let a = float3(
-//                hash_noise(coord, 0),
-//                hash_noise(coord, 1),
-//                hash_noise(coord, 2));
-//            hash += dot(a, float3(1.0, 2.0, 3.0));
-//        }
-//    }
-//    data[invocation_id.x] = (uint)hash;
-//}
+////[numthreads(1, 1, 1)]
+////void main(uint3 invocation_id: SV_DispatchThreadID)
+////{
+////    float hash = (float)settings.x;
+////    for (uint x = 0u; x < settings.y; x++)
+////    {
+////        for (uint y = 0u; y < settings.z; y++)
+////        {
+////            uint2 coord = uint2(x, y);
+////            let a = float3(
+////                hash_noise(coord, 0),
+////                hash_noise(coord, 1),
+////                hash_noise(coord, 2));
+////            hash += dot(a, float3(1.0, 2.0, 3.0));
+////        }
+////    }
+////    data[invocation_id.x] = (uint)hash;
+////}
 
 /*
 
@@ -173,31 +190,28 @@ void main(uint3 invocation_id: SV_DispatchThreadID)
 */
 
 // Eq perf now
-// [numthreads(1, 1, 1)]
+//[numthreads(1, 1, 1)]
 // void main(uint3 invocation_id: SV_DispatchThreadID)
-// {
-//     float hash = (float)settings.x;
-//     for (uint x = 0u; x < settings.y; x++)
-//     {
-//         for (uint y = 0u; y < settings.z; y++)
-//         {
-//             uint2 coord = uint2(x, y);
-//             hash += hash_noise(coord, 0);
-//         }
-//     }
-//     data[invocation_id.x] = (uint)hash;
-// }
+//{
+//    float hash = (float)settings.x;
+//    for (uint x = 0u; x < settings.y; x++)
+//    {
+//        for (uint y = 0u; y < settings.z; y++)
+//        {
+//            uint2 coord = uint2(x, y);
+//            hash += hash_noise(coord, 0);
+//        }
+//    }
+//    data[invocation_id.x] = (uint)hash;
+//}
 
 //[numthreads(1, 1, 1)]
 // void main(uint3 invocation_id: SV_DispatchThreadID)
 //{
 //    uint hash = settings.x;
-//    for (uint i = 0u; i < settings.y; i++)
+//    for (uint i = 0u; i < settings.y * settings.z; i++)
 //    {
-//        for (uint j = 0u; j < settings.z; j++)
-//        {
-//            hash = (hash * 1597334673);
-//        }
+//        hash = (hash * 1597334673);
 //    }
 //    data[invocation_id.x] = hash;
 //}

@@ -57,7 +57,9 @@ fn intersect(p0: vec3<f32>, p1: vec3<f32>, p2: vec3<f32>, origin: vec3<f32>, dir
 //                hash_noise(coord, 1u),
 //                hash_noise(coord, 2u),
 //            );
-//            hash += dot(a, vec3(1.0,2.0,3.0));
+//            //hash += dot(a, vec3(1.0, 2.0, 3.0));
+//            let b = (a * vec3(1.0, 2.0, 3.0));
+//            hash += b.x + b.y + b.z;
 //        }
 //    }
 //    data[invocation_id.x] = u32(hash);
@@ -106,6 +108,7 @@ fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
 
 */
 
+// FULL
 
 @compute @workgroup_size(1, 1, 1)
 fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
@@ -164,10 +167,8 @@ fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
 //@compute @workgroup_size(1, 1, 1)
 //fn main(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
 //    var hash = settings.x;
-//    for (var i = 0u; i < settings.y; i += 1u) {
-//        for (var j = 0u; j < settings.z; j += 1u) {
-//            hash = (hash * 1597334673u);
-//        }
+//    for (var i = 0u; i < settings.y * settings.z; i += 1u) {
+//        hash = (hash * 1597334673u);
 //    }
 //    data[invocation_id.x] = hash;
 //}

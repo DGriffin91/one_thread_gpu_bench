@@ -16,12 +16,11 @@ wgpu = { version = "0.16.0", features = ["spirv", "vulkan-portability"] }
 structopt = "0.3"
 bytemuck = "1.6.3"
 
-spirv-builder = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "83f8c72f04a6af673b0533a0f03527b7756f883e", features = [
-    "watch",
-] }
+spirv-builder = { version = "0.9", features = ["watch"] }
 
 # for glam
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "83f8c72f04a6af673b0533a0f03527b7756f883e" }
+spirv-std = { version = "0.9" }
+
 
 # Compile build-dependencies in release mode with
 # the same settings as regular dependencies.
@@ -30,3 +29,7 @@ opt-level = 3
 codegen-units = 16
 [profile.dev.build-override]
 opt-level = 3
+
+[patch.crates-io]
+spirv-builder = { git = "https://github.com/LykenSol/rust-gpu", rev = "d609fce65055ecc0a1109736d56dab2dc3b566ca" }
+spirt = { git = "https://github.com/EmbarkStudios/spirt", branch = "vector" }

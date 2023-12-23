@@ -193,3 +193,14 @@ macro_rules! for_ {
         }
     }};
 }
+
+//#[macro_export]
+//macro_rules! for_ {
+//    (($start:stmt; $cond:expr; $inc:expr) { $($body:tt)* }) => {{
+//        $start
+//        while $cond {
+//            $($body)*
+//            $inc;
+//        }
+//    }};
+//}

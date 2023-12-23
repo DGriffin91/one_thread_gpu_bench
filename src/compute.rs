@@ -1,7 +1,8 @@
-use crate::{maybe_watch, timestamp::Timestamp, Options};
+use crate::{maybe_watch, output_glsl, timestamp::Timestamp, Options};
 use spirv_std::glam::UVec4;
 
 use std::{
+    borrow::Cow,
     convert::TryInto,
     io::Read,
     path::{Path, PathBuf},
@@ -37,29 +38,39 @@ pub fn start(options: &Options) {
     let cpu_result = compute_shader::compute(&UVec4::splat(options.size));
     println!("{}\trust cpu", to_ms_round(start.elapsed()));
 
-    let (gpu_duration, _gpu_result) = futures::executor::block_on(start_internal(
-        options,
-        compiled_shader_modules.named_spv_modules[0].1.clone(),
-    ));
-    println!("{}\trust gpu warm up", to_ms_round(gpu_duration));
-
-    let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
-        options,
-        compiled_shader_modules.named_spv_modules[0].1.clone(),
-    ));
-    println!("{}\trust gpu", to_ms_round(gpu_duration));
-    print_if_not_eq(cpu_result, gpu_result);
+    //let (gpu_duration, _gpu_result) = futures::executor::block_on(start_internal(
+    //    options,
+    //    compiled_shader_modules.named_spv_modules[0].1.clone(),
+    //));
+    //println!("{}\trust gpu warm up", to_ms_round(gpu_duration));
+    //
+    //let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
+    //    options,
+    //    compiled_shader_modules.named_spv_modules[0].1.clone(),
+    //));
+    //println!("{}\trust gpu", to_ms_round(gpu_duration));
+    //print_if_not_eq(cpu_result, gpu_result);
 
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
 
     let rust_spv = src.join("compute_shader_rust.spv");
     let rust_spv_opt = src.join("compute_shader_rust.opt.spv");
+
+    spirv_opt(&rust_spv, &rust_spv_opt);
+    run_spv(&rust_spv_opt, options, cpu_result, "rust > warm up");
+    spirv_opt(&rust_spv, &rust_spv_opt);
+    run_spv(&rust_spv_opt, options, cpu_result, "rust > warm up");
+
     spirv_opt(&rust_spv, &rust_spv_opt);
     run_spv(&rust_spv_opt, options, cpu_result, "rust > opt");
+
+    output_glsl(&rust_spv_opt);
 
     let wgsl = src.join("compute_shader.wgsl");
     let wgsl_spv = src.join("compute_shader.wgsl.spv");
     let wgsl_spv_opt = src.join("compute_shader.wgsl.opt.spv");
+
+    output_glsl(&wgsl_spv_opt);
 
     naga(&wgsl, &wgsl_spv);
     run_spv(&wgsl_spv, options, cpu_result, "wgsl");
@@ -196,9 +207,10 @@ fn run_spv(
     let slang_spv = load_shader_module(slang_spv_path);
     let (gpu_duration, gpu_result) = futures::executor::block_on(start_internal(
         options,
-        ShaderModuleDescriptor {
+        ShaderModuleDescriptorSpirV {
             label: None,
-            source: util::make_spirv(&slang_spv),
+            //source: util::make_spirv(&slang_spv),
+            source: util::make_spirv_raw(&slang_spv),
         },
     ));
     println!("{}\t{}", to_ms_round(gpu_duration), text);
@@ -212,7 +224,7 @@ fn to_ms_round(d: Duration) -> String {
 
 async fn start_internal(
     options: &Options,
-    shader_module: ShaderModuleDescriptor<'_>,
+    shader_module: ShaderModuleDescriptorSpirV<'_>,
 ) -> (Duration, u32) {
     let backends = backend_bits_from_env().unwrap_or(Backends::PRIMARY);
     let instance = Instance::new(InstanceDescriptor {
@@ -223,7 +235,9 @@ async fn start_internal(
         .await
         .expect("Failed to find an appropriate adapter");
 
-    let features = Features::TIMESTAMP_QUERY | Features::TIMESTAMP_QUERY_INSIDE_PASSES;
+    let features = Features::TIMESTAMP_QUERY
+        | Features::TIMESTAMP_QUERY_INSIDE_PASSES
+        | Features::SPIRV_SHADER_PASSTHROUGH;
 
     let (device, queue) = adapter
         .request_device(
@@ -239,7 +253,8 @@ async fn start_internal(
     drop(instance);
     drop(adapter);
 
-    let module = device.create_shader_module(shader_module);
+    //let module = device.create_shader_module(&shader_module);
+    let module = unsafe { device.create_shader_module_spirv(&shader_module) };
 
     let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
         label: None,

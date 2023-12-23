@@ -40,17 +40,7 @@ fn maybe_watch(
             .iter()
             .copied()
             .collect::<PathBuf>();
-        let glsl_path = spv_path.with_extension("glsl");
-        let _ = std::fs::remove_file(&glsl_path);
-        let mut cmd = Command::new("spirv-cross");
-        cmd.arg(&spv_path).arg("--output").arg(&glsl_path);
-        let out = cmd.output().expect("failed to execute process");
-        if out.stderr.len() > 1 {
-            println!(
-                "spirv-cross stderr: {}",
-                String::from_utf8_lossy(&out.stderr)
-            );
-        }
+        output_glsl(&spv_path);
         Command::new("spv-lower-print")
             .arg(&spv_path)
             .output()
@@ -80,6 +70,20 @@ fn maybe_watch(
     handle_compile_result(initial_result)
 }
 
+fn output_glsl(spv_path: &std::path::PathBuf) {
+    let glsl_path = spv_path.with_extension("glsl");
+    let _ = std::fs::remove_file(&glsl_path);
+    let mut cmd = Command::new("spirv-cross");
+    cmd.arg(spv_path).arg("--output").arg(&glsl_path);
+    let out = cmd.output().expect("failed to execute process");
+    if out.stderr.len() > 1 {
+        println!(
+            "spirv-cross stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
 #[derive(StructOpt, Clone)]
 #[structopt(name = "example-runner-wgpu")]
 pub struct Options {
@@ -90,7 +94,7 @@ pub struct Options {
 }
 
 pub fn main() {
-    std::env::set_var("WGPU_POWER_PREF", "high");
+    std::env::set_var("WGPU_POWER_PREF", "low");
 
     let options: Options = Options::from_args();
     return compute::start(&options);

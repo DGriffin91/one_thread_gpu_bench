@@ -7,7 +7,11 @@ edition = "2021"
 crate-type = ["dylib", "lib"]
 
 [dependencies]
-spirv-std = { git = "https://github.com/EmbarkStudios/rust-gpu", rev = "83f8c72f04a6af673b0533a0f03527b7756f883e" }
+spirv-std = { version = "0.9" }
 
 [target.'cfg(not(target_arch = "spirv"))'.dependencies]
 rayon = "1.5"
+
+[patch.crates-io]
+spirv-builder = { git = "https://github.com/LykenSol/rust-gpu", rev = "d609fce65055ecc0a1109736d56dab2dc3b566ca" }
+spirt = { git = "https://github.com/EmbarkStudios/spirt", branch = "vector" }
